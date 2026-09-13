@@ -1,0 +1,44 @@
+name: qualification
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qualification-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  maintenance-qualification:
+    name: maintenance-qualification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out the exact pull-request head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Run the base-owned independent acceptance contract
+        env:
+          QUALIFICATION_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          QUALIFICATION_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          verifier="$RUNNER_TEMP/cayu-1444-verify-candidate.py"
+          git show "$QUALIFICATION_BASE_SHA:.github/qualification/verify_candidate.py" > "$verifier"
+          python "$verifier" \
+            --repository "$GITHUB_WORKSPACE" \
+            --base "$QUALIFICATION_BASE_SHA" \
+            --head "$QUALIFICATION_HEAD_SHA"
